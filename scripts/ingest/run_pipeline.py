@@ -8,11 +8,17 @@ Complete workflow for downloading and processing OpenStreetMap data for Cork.
 import logging
 import json
 import os
+import sys
 from pathlib import Path
 from datetime import datetime
 
 from scripts.ingest.osm_download import download_cork_network
 from scripts.ingest.osm_parser import parse_cork_network
+
+# Console output uses emoji; force UTF-8 so this doesn't crash on Windows
+# terminals that default to a legacy code page (e.g. cp1252).
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 logging.basicConfig(
     level=logging.INFO,

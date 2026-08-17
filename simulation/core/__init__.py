@@ -75,15 +75,15 @@ class Simulation:
         num_steps = int((self.config.end_time - self.config.start_time) / self.config.timestep)
         
         for step in range(num_steps):
-            self.state.current_step = step
-            self.state.current_time = self.config.start_time + step * self.config.timestep
-            
+            self.state.current_step = step + 1
+            self.state.current_time = self.config.start_time + (step + 1) * self.config.timestep
+
             # Placeholder: simulate one timestep
             if step % 100 == 0:
                 print(f"  Step {step}/{num_steps}")
-        
+
         print(f"Simulation complete: {self.state.current_step} steps")
-        
+
         return {
             "name": self.config.name,
             "steps": self.state.current_step,

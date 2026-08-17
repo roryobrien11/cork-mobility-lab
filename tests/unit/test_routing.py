@@ -262,6 +262,53 @@ class TestRouter:
         assert len(dijkstra_route.node_sequence) == len(astar_route.node_sequence)
         assert abs(dijkstra_route.total_distance_m - astar_route.total_distance_m) < 0.01
     
+    def test_astar_matches_dijkstra_with_heterogeneous_speeds(self):
+        """
+        A* must return the same optimal travel time as Dijkstra even when
+        edges have very different speeds and nodes are spread far apart.
+
+        Regression test: the A* heuristic used to return straight-line
+        distance in metres while g_score accumulates travel time in
+        seconds. Over short, uniform-speed test networks the resulting
+        magnitude mismatch was too small to break tie-breaking, but with
+        widely spaced nodes (as in the real Cork network) the inadmissible
+        heuristic caused A* to close the destination early and return a
+        slower route than Dijkstra's optimum.
+        """
+        network = Network.create("Heterogeneous Speed Network")
+
+        a = Node.create(lat=51.80, lon=-8.60, junction_type=JunctionType.PRIORITY)
+        b = Node.create(lat=51.90, lon=-8.50, junction_type=JunctionType.PRIORITY)
+        # X sits close to A but geographically far from B (large heuristic to B).
+        x = Node.create(lat=51.80, lon=-8.61, junction_type=JunctionType.PRIORITY)
+        # Y sits geographically close to B (small heuristic to B), tempting a
+        # distance-driven search to prefer it even though it's the slow route.
+        y = Node.create(lat=51.895, lon=-8.505, junction_type=JunctionType.PRIORITY)
+
+        for node in (a, b, x, y):
+            network.add_node(node)
+
+        # Path via X: fast (motorway-speed) end to end -> lowest travel time.
+        network.add_edge(Edge.create(source_id=a.id, target_id=x.id, length_m=500, speed_limit_kmh=120))
+        network.add_edge(Edge.create(source_id=x.id, target_id=b.id, length_m=20000, speed_limit_kmh=120))
+
+        # Path via Y: geographically tempting (Y is near B) but slow throughout.
+        network.add_edge(Edge.create(source_id=a.id, target_id=y.id, length_m=20000, speed_limit_kmh=20))
+        network.add_edge(Edge.create(source_id=y.id, target_id=b.id, length_m=500, speed_limit_kmh=20))
+
+        router = Router(network)
+
+        dijkstra_route = router.dijkstra(a.id, b.id, weight_key="travel_time")
+        astar_route = router.astar(a.id, b.id, heuristic="haversine")
+
+        assert dijkstra_route is not None
+        assert astar_route is not None
+        # The fast route via X should win on travel time, not the
+        # geographically-tempting-but-slow route via Y.
+        assert dijkstra_route.node_sequence == [a.id, x.id, b.id]
+        assert astar_route.node_sequence == dijkstra_route.node_sequence
+        assert abs(astar_route.total_travel_time_s - dijkstra_route.total_travel_time_s) < 1e-6
+
     def test_haversine_distance_calculation(self):
         """Test Haversine distance calculation."""
         router = Router(Network.create("Test"))

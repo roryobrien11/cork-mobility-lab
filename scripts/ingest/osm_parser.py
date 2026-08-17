@@ -5,6 +5,7 @@ Parse OpenStreetMap data into Cork Mobility Lab network models.
 Converts OSM nodes/edges to simulation.network.Node/Edge domain models.
 """
 
+import json
 import logging
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -15,6 +16,18 @@ from shapely.geometry import Point, LineString
 from simulation.network import Network, Node, Edge, RoadType, JunctionType
 
 logger = logging.getLogger(__name__)
+
+
+def _read_geojson(path: str) -> gpd.GeoDataFrame:
+    """
+    Read a GeoJSON file into a GeoDataFrame without requiring fiona/pyogrio
+    (and therefore without requiring a working GDAL install). We only ever
+    read files this pipeline wrote itself via GeoDataFrame.to_json(), so a
+    plain feature-collection parse is sufficient.
+    """
+    with open(path, "r", encoding="utf-8") as f:
+        geojson = json.load(f)
+    return gpd.GeoDataFrame.from_features(geojson["features"], crs="EPSG:4326")
 
 
 class OSMParser:
@@ -63,11 +76,11 @@ class OSMParser:
             Network domain model
         """
         logger.info(f"Parsing nodes from {nodes_file}")
-        nodes_gdf = gpd.read_file(nodes_file)
+        nodes_gdf = _read_geojson(nodes_file)
         self._parse_nodes(nodes_gdf)
 
         logger.info(f"Parsing edges from {edges_file}")
-        edges_gdf = gpd.read_file(edges_file)
+        edges_gdf = _read_geojson(edges_file)
         self._parse_edges(edges_gdf)
 
         # Create network
@@ -117,12 +130,18 @@ class OSMParser:
             source_node = self.nodes_by_osm_id[u]
             target_node = self.nodes_by_osm_id[v]
 
-            # Calculate length from geometry
-            if row.geometry.geom_type == "LineString":
-                length_m = row.geometry.length * 111000  # Rough conversion from degrees to meters
-            else:
-                logger.debug(f"Non-linestring geometry for edge {u}->{v}, skipping")
-                continue
+            # Prefer osmnx's precomputed geodesic length (metres); it accounts
+            # for the fact that a degree of longitude is shorter than a degree
+            # of latitude at Cork's ~52N latitude, unlike a flat degrees*111000
+            # approximation.
+            length_m = row.get("length")
+            if length_m is None or (isinstance(length_m, float) and length_m != length_m):
+                if row.geometry.geom_type == "LineString":
+                    length_m = row.geometry.length * 111000
+                else:
+                    logger.debug(f"Non-linestring geometry for edge {u}->{v}, skipping")
+                    continue
+            length_m = float(length_m)
 
             # Get road type
             highway = row.get("highway", "unclassified")
@@ -131,18 +150,25 @@ class OSMParser:
             
             road_type = self.ROAD_TYPE_MAPPING.get(highway, RoadType.UNCLASSIFIED)
 
-            # Get speed limit (or use default)
+            # Get speed limit (or use default). OSM ways that were split by
+            # osmnx simplification can carry maxspeed/lanes as a list of
+            # per-segment values (e.g. ["50", "30"]) rather than a scalar;
+            # take the first value in that case.
             speed_kmh = row.get("maxspeed")
+            if isinstance(speed_kmh, list):
+                speed_kmh = speed_kmh[0] if speed_kmh else None
             if speed_kmh is None or speed_kmh == "":
                 speed_kmh = self.DEFAULT_SPEEDS.get(road_type, 40)
             else:
                 try:
-                    speed_kmh = float(speed_kmh) if isinstance(speed_kmh, str) else speed_kmh
+                    speed_kmh = float(speed_kmh) if isinstance(speed_kmh, str) else float(speed_kmh)
                 except (ValueError, TypeError):
                     speed_kmh = self.DEFAULT_SPEEDS.get(road_type, 40)
 
             # Get lanes
             lanes = row.get("lanes", 1)
+            if isinstance(lanes, list):
+                lanes = lanes[0] if lanes else 1
             try:
                 lanes = int(lanes) if lanes else 1
             except (ValueError, TypeError):
@@ -183,8 +209,11 @@ def parse_cork_network(
 
 
 if __name__ == "__main__":
+    import sys
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     logging.basicConfig(level=logging.INFO)
-    
+
     try:
         network = parse_cork_network()
         print(f"\n✅ Network parsed successfully!")

@@ -221,19 +221,19 @@ PostGIS      │    Engine
 
 The project is built incrementally:
 
-### Phase 1: Road Network (CURRENT)
+### Phase 1: Road Network
 - [x] Domain models for nodes and edges
 - [x] Network graph structure
 - [x] Basic tests
-- [ ] Cork OSM data ingestion
+- [x] Cork OSM data ingestion (see [docs/data_sources.md](docs/data_sources.md))
 
-### Phase 2: Routing
-- [ ] Dijkstra's algorithm
-- [ ] A* with heuristics
-- [ ] Tests with known paths
+### Phase 2: Routing (CURRENT)
+- [x] Dijkstra's algorithm
+- [x] A* with heuristics
+- [x] Tests with known paths
 
 ### Phase 3: Vehicle Agents
-- [ ] Vehicle model with state machine
+- [x] Vehicle model with state machine
 - [ ] Discrete-time simulation loop
 
 ### Phase 4: Car-Following Model
@@ -405,4 +405,8 @@ Cork Mobility Lab is a research project. For questions or collaboration, contact
 
 ---
 
-**Status**: Initial scaffolding complete. Ready for Phase 2 (Cork OSM ingestion).
+**Status**: Real Cork road network ingested from OpenStreetMap (10,400 nodes,
+22,801 edges, 2,511 km — see [docs/data_sources.md](docs/data_sources.md)).
+Dijkstra and A* routing implemented and verified against the real network.
+Vehicle agents have a state machine and route assignment. Next: the
+discrete-time simulation loop and car-following model (Phase 4/5).

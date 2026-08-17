@@ -76,6 +76,16 @@ class Router:
         """
         self.network = network
         self._route_counter = 0
+
+        # A* costs (g_score) are accumulated in seconds via edge.travel_time_s(),
+        # so the heuristic must also estimate remaining cost in seconds, not
+        # metres, or the search loses its correctness guarantee entirely. We
+        # convert straight-line distance to a lower-bound travel time by
+        # dividing by the fastest free-flow speed present in the network:
+        # since no edge can be traversed faster than that, this heuristic
+        # never overestimates the true remaining cost (admissible).
+        speeds = [edge.free_flow_speed_ms for edge in network.edges.values()]
+        self._max_speed_ms = max(speeds) if speeds else 33.3  # ~120 km/h fallback
     
     def dijkstra(
         self,
@@ -284,14 +294,22 @@ class Router:
         )
     
     def _heuristic(self, current_node, destination_node, heuristic_type: str) -> float:
-        """Calculate heuristic distance to destination."""
-        
+        """
+        Estimate remaining travel time (seconds) to the destination.
+
+        g_score is accumulated in seconds, so the straight-line distance
+        estimate is converted to seconds via the network's fastest free-flow
+        speed, keeping the heuristic admissible (never overestimates).
+        """
+
         if heuristic_type == "haversine":
-            return self._haversine_distance(current_node, destination_node)
+            distance_m = self._haversine_distance(current_node, destination_node)
         elif heuristic_type == "manhattan":
-            return self._manhattan_distance(current_node, destination_node)
+            distance_m = self._manhattan_distance(current_node, destination_node)
         else:
             return 0.0
+
+        return distance_m / self._max_speed_ms
     
     @staticmethod
     def _haversine_distance(node1, node2) -> float:

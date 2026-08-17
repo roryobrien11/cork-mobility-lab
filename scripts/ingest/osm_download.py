@@ -7,6 +7,7 @@ Uses osmnx to fetch road network data from OSM.
 
 import logging
 import os
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -57,12 +58,10 @@ def download_cork_network(
         logger.info("Fetching network from OpenStreetMap (this may take a moment)...")
         
         # Use bounding box for more reliable results
+        # osmnx expects bbox as (left, bottom, right, top) = (west, south, east, north)
         north, south, east, west = CORK_BBOX
         graph = ox.graph_from_bbox(
-            north=north,
-            south=south,
-            east=east,
-            west=west,
+            (west, south, east, north),
             network_type=network_type,
             simplify=True,
             retain_all=False,
@@ -77,11 +76,18 @@ def download_cork_network(
         nodes_file = os.path.join(output_dir, "cork_nodes.geojson")
         edges_file = os.path.join(output_dir, "cork_edges.geojson")
 
-        # Save nodes and edges
+        # Save nodes and edges. We write GeoJSON via GeoDataFrame.to_json()
+        # rather than to_file(), since to_file() requires a working
+        # fiona/pyogrio + GDAL install, which isn't reliably available on
+        # every dev machine (e.g. Windows without GDAL on PATH).
         nodes_gdf, edges_gdf = ox.graph_to_gdfs(graph)
-        
-        nodes_gdf.to_file(nodes_file, driver="GeoJSON")
-        edges_gdf.to_file(edges_file, driver="GeoJSON")
+        nodes_gdf = nodes_gdf.reset_index()  # osmid: index -> column
+        edges_gdf = edges_gdf.reset_index()  # u, v, key: index -> columns
+
+        with open(nodes_file, "w", encoding="utf-8") as f:
+            f.write(nodes_gdf.to_json())
+        with open(edges_file, "w", encoding="utf-8") as f:
+            f.write(edges_gdf.to_json())
 
         logger.info(f"✅ Network saved to {edges_file}")
         logger.info(f"✅ Nodes saved to {nodes_file}")
@@ -102,8 +108,10 @@ def list_downloaded_networks(data_dir: str = "data/raw") -> list:
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     logging.basicConfig(level=logging.INFO)
-    
+
     try:
         output_file = download_cork_network()
         print(f"\n✅ Cork network downloaded to: {output_file}")
