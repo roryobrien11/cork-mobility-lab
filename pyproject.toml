@@ -29,6 +29,7 @@ dependencies = [
     "matplotlib>=3.8.0",
     "python-dotenv>=1.0.0",
     "httpx>=0.25.0",
+    "osmnx>=1.8.0",
 ]
 
 [project.optional-dependencies]
