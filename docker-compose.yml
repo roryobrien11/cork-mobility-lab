@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgis/postgis:15-3.3
+    container_name: cork-mobility-postgres
+    environment:
+      POSTGRES_USER: cork_user
+      POSTGRES_PASSWORD: cork_password
+      POSTGRES_DB: cork_mobility
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cork_user -d cork_mobility"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: cork-mobility-api
+    environment:
+      DATABASE_URL: postgresql://cork_user:cork_password@postgres:5432/cork_mobility
+      ENVIRONMENT: development
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./apps/api:/app/apps/api
+      - ./simulation:/app/simulation
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: uvicorn apps.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: cork-mobility-web
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./apps/web/src:/app/src
+      - ./apps/web/public:/app/public
+    depends_on:
+      - api
+    command: npm run dev
+
+volumes:
+  postgres_data:
