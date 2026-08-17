@@ -234,11 +234,12 @@ The project is built incrementally:
 
 ### Phase 3: Vehicle Agents
 - [x] Vehicle model with state machine
-- [ ] Discrete-time simulation loop
+- [x] Discrete-time simulation loop
 
-### Phase 4: Car-Following Model
-- [ ] Intelligent Driver Model (IDM)
-- [ ] Physics validation
+### Phase 4: Car-Following Model (CURRENT)
+- [x] Intelligent Driver Model (IDM)
+- [x] Physics validation (unit tests on acceleration behaviour)
+- [ ] Calibration against observed data
 
 ### Phase 5: Traffic Signals & Junctions
 - [ ] Signal phase control
@@ -249,9 +250,9 @@ The project is built incrementally:
 - [ ] Origin-destination matrices
 
 ### Phase 7: Simulation Engine
-- [ ] Main event loop
-- [ ] Time advancement
-- [ ] Vehicle lifecycle
+- [x] Main event loop
+- [x] Time advancement
+- [x] Vehicle lifecycle (waiting → driving → queued → arrived)
 
 ### Phase 8: Metrics & Measurement
 - [ ] Travel time, congestion, emissions
@@ -408,5 +409,11 @@ Cork Mobility Lab is a research project. For questions or collaboration, contact
 **Status**: Real Cork road network ingested from OpenStreetMap (10,400 nodes,
 22,801 edges, 2,511 km — see [docs/data_sources.md](docs/data_sources.md)).
 Dijkstra and A* routing implemented and verified against the real network.
-Vehicle agents have a state machine and route assignment. Next: the
-discrete-time simulation loop and car-following model (Phase 4/5).
+Vehicles now actually drive: a discrete-time simulation loop moves them
+along their routed path using the Intelligent Driver Model for
+car-following, with realistic emergent behaviour (e.g. a 7km real-Cork
+trip completes in ~8.5 simulated minutes at ~50 km/h average speed; 300
+concurrent vehicles all complete their trips over a simulated 30 minutes
+in ~5s of wall-clock time). Junction/signal interaction between vehicles
+on different edges is not modelled yet — see Phase 5. Next: traffic
+signals and junction logic, then demand generation.

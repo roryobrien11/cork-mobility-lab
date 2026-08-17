@@ -7,6 +7,16 @@ from typing import List, Optional
 from enum import Enum
 import uuid
 
+from simulation.agents.idm import IDMParameters, DEFAULT_IDM_PARAMETERS, idm_acceleration
+
+__all__ = [
+    "Vehicle",
+    "VehicleState",
+    "IDMParameters",
+    "DEFAULT_IDM_PARAMETERS",
+    "idm_acceleration",
+]
+
 
 class VehicleState(Enum):
     """Vehicle operational state."""
@@ -52,6 +62,7 @@ class Vehicle:
     planned_route: Optional[object] = None  # Route object from Router
     arrival_time: Optional[float] = None
     current_node_idx: int = 0
+    distance_traveled_m: float = 0.0
     
     @classmethod
     def create(
